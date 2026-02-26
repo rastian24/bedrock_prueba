@@ -142,6 +142,7 @@ class FileTree(QWidget):
         if ok and name.strip():
             folder = self.current_folder()
             path = self.vault.create_note(name.strip(), folder)
+            self._refresh_proxy()
             self.note_created.emit(str(path))
 
     def _new_folder(self) -> None:
@@ -151,6 +152,7 @@ class FileTree(QWidget):
         if ok and name.strip():
             folder = self.current_folder()
             self.vault.create_folder(name.strip(), folder)
+            self._refresh_proxy()
 
     def _rename(self, proxy_index: QModelIndex) -> None:
         if not self.vault:
@@ -160,6 +162,7 @@ class FileTree(QWidget):
         new_name, ok = QInputDialog.getText(self, "Rename", "New name:", text=path.name)
         if ok and new_name.strip():
             self.vault.rename(path, new_name.strip())
+            self._refresh_proxy()
 
     def _delete(self, proxy_index: QModelIndex) -> None:
         if not self.vault:
@@ -176,3 +179,8 @@ class FileTree(QWidget):
                 self.vault.delete_folder(path)
             else:
                 self.vault.delete_note(path)
+            self._refresh_proxy()
+
+    def _refresh_proxy(self) -> None:
+        """Force the proxy filter to re-evaluate so new/removed files appear immediately."""
+        self.proxy.invalidateFilter()

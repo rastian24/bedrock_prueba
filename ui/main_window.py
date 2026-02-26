@@ -286,6 +286,7 @@ class MainWindow(QMainWindow):
         if note_path is None:
             # Create the note
             note_path = self.vault.create_note(target)
+            self.file_tree.refresh()
         self._on_note_selected(note_path)
 
     def _on_tag_clicked(self, tag: str) -> None:
@@ -302,9 +303,7 @@ class MainWindow(QMainWindow):
             return
         name, ok = QInputDialog.getText(self, "New Note", "Note name:")
         if ok and name.strip():
-            # Get current folder from file tree
-            folder = self.file_tree.current_folder()
-            note_path = self.vault.create_note(name.strip(), folder)
+            note_path = self.vault.create_note(name.strip(), self.vault.path)
             self.file_tree.refresh()
             self._on_note_selected(note_path)
 
