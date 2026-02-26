@@ -248,6 +248,7 @@ class MainWindow(QMainWindow):
             return
         self.editor.save_now()
         self.editor.open_note(path)
+        self.file_tree.select_note(path)
         self.file_label.setText(path.name)
         self._update_word_count()
         self._update_backlinks()

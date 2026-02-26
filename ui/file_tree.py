@@ -89,6 +89,14 @@ class FileTree(QWidget):
         for col in range(1, self.fs_model.columnCount()):
             self.tree.hideColumn(col)
 
+    def select_note(self, path: Path) -> None:
+        """Select and reveal a note in the tree."""
+        source_idx = self.fs_model.index(str(path))
+        proxy_idx = self.proxy.mapFromSource(source_idx)
+        if proxy_idx.isValid():
+            self.tree.setCurrentIndex(proxy_idx)
+            self.tree.scrollTo(proxy_idx)
+
     def current_folder(self) -> Path | None:
         """Return the currently selected folder, or vault root."""
         idx = self.tree.currentIndex()
