@@ -37,6 +37,7 @@ class JournalPanel(QWidget):
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(True)
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        self.calendar.clicked.connect(self._on_date_clicked)
         self.calendar.activated.connect(self._on_date_activated)
         layout.addWidget(self.calendar)
 
@@ -112,8 +113,17 @@ class JournalPanel(QWidget):
         self.refresh()
         self.note_clicked.emit(str(path))
 
+    def _on_date_clicked(self, qdate: QDate) -> None:
+        """Open a journal note if one exists for the clicked date."""
+        if not self.vault:
+            return
+        date = datetime.date(qdate.year(), qdate.month(), qdate.day())
+        if date in self._journal_dates:
+            path = self.vault.path / "journal" / f"{date.isoformat()}.md"
+            self.note_clicked.emit(str(path))
+
     def _on_date_activated(self, qdate: QDate) -> None:
-        """Open or create a journal note for the selected date."""
+        """Open or create a journal note for the double-clicked date."""
         if not self.vault:
             return
         date = datetime.date(qdate.year(), qdate.month(), qdate.day())
