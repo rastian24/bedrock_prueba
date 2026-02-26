@@ -1,5 +1,7 @@
 """Vault management — read/write/list .md files in a folder."""
 
+import datetime
+import locale
 from pathlib import Path
 
 
@@ -81,6 +83,39 @@ class Vault:
         import shutil
         if path.exists() and path.is_dir():
             shutil.rmtree(path)
+
+    def ensure_journal_note(self, date: datetime.date | None = None) -> Path:
+        """Ensure a journal note exists for the given date and return its path.
+
+        Creates the journal/ directory and YYYY-MM-DD.md file if they don't exist.
+        """
+        if date is None:
+            date = datetime.date.today()
+
+        journal_dir = self.path / "journal"
+        journal_dir.mkdir(exist_ok=True)
+
+        filename = date.strftime("%Y-%m-%d") + ".md"
+        note_path = journal_dir / filename
+
+        if not note_path.exists():
+            # Format heading like "# 26 de febrero de 2026"
+            try:
+                old_locale = locale.getlocale(locale.LC_TIME)
+                locale.setlocale(locale.LC_TIME, ("es_ES", "UTF-8"))
+                heading = date.strftime("# %-d de %B de %Y")
+                locale.setlocale(locale.LC_TIME, old_locale)
+            except (locale.Error, ValueError):
+                # Fallback: manual Spanish month names
+                months = [
+                    "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+                    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+                ]
+                heading = f"# {date.day} de {months[date.month]} de {date.year}"
+
+            note_path.write_text(f"{heading}\n\n", encoding="utf-8")
+
+        return note_path
 
     def rename(self, old_path: Path, new_name: str) -> Path:
         """Rename a file or folder."""

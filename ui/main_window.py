@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QStatusBar,
-    QLabel, QMessageBox, QInputDialog,
+    QLabel, QMessageBox, QInputDialog, QTabWidget,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QByteArray
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -19,6 +19,7 @@ from ui.editor.wysiwyg_editor import WysiwygEditor
 from ui.backlinks_panel import BacklinksPanel
 from ui.tag_panel import TagPanel
 from ui.search_panel import SearchDialog, VaultSearchPanel
+from ui.journal_panel import JournalPanel
 
 
 class IndexWorker(QThread):
@@ -61,18 +62,25 @@ class MainWindow(QMainWindow):
         self._open_initial_vault()
 
     def _setup_ui(self) -> None:
-        # Left sidebar
-        self.left_sidebar = QWidget()
+        # Left sidebar with tabs
+        self.left_sidebar = QTabWidget()
         self.left_sidebar.setObjectName("sidebar_left")
-        left_layout = QVBoxLayout(self.left_sidebar)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
 
+        # Explorer tab (file tree + tags)
+        explorer_tab = QWidget()
+        explorer_layout = QVBoxLayout(explorer_tab)
+        explorer_layout.setContentsMargins(0, 0, 0, 0)
+        explorer_layout.setSpacing(0)
         self.file_tree = FileTree()
         self.tag_panel = TagPanel()
+        explorer_layout.addWidget(self.file_tree, stretch=3)
+        explorer_layout.addWidget(self.tag_panel, stretch=1)
 
-        left_layout.addWidget(self.file_tree, stretch=3)
-        left_layout.addWidget(self.tag_panel, stretch=1)
+        # Journal tab
+        self.journal_panel = JournalPanel()
+
+        self.left_sidebar.addTab(explorer_tab, "Explorer")
+        self.left_sidebar.addTab(self.journal_panel, "Journal")
 
         # Editor
         self.editor = WysiwygEditor()
@@ -120,6 +128,7 @@ class MainWindow(QMainWindow):
         self.editor.wikilink_clicked.connect(self._on_wikilink_clicked)
         self.backlinks_panel.note_clicked.connect(self._on_note_selected)
         self.tag_panel.tag_clicked.connect(self._on_tag_clicked)
+        self.journal_panel.note_clicked.connect(self._on_note_selected)
         self.vault_search_panel.note_clicked.connect(self._on_note_selected)
 
     def _setup_shortcuts(self) -> None:
@@ -135,6 +144,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Shift+F"), self, self._vault_search)
         # Change vault
         QShortcut(QKeySequence("Ctrl+Shift+O"), self, self._change_vault)
+        # Open today's journal
+        QShortcut(QKeySequence("Ctrl+D"), self, self._open_today_journal)
 
     def _toggle_left_sidebar(self) -> None:
         self.left_sidebar.setVisible(not self.left_sidebar.isVisible())
@@ -197,9 +208,13 @@ class MainWindow(QMainWindow):
         # Set vault on components
         self.file_tree.set_vault(self.vault)
         self.editor.set_vault(self.vault)
+        self.journal_panel.set_vault(self.vault)
 
         # Build index in background
         self._build_index()
+
+        # Open today's journal
+        self._open_today_journal()
 
     def _build_index(self) -> None:
         if not self.vault or not self.search_engine:
@@ -213,6 +228,17 @@ class MainWindow(QMainWindow):
         self.save_status_label.setText("Ready")
         self._update_backlinks()
         self._update_tags()
+        self.journal_panel.refresh()
+
+    # --- Journal ---
+
+    def _open_today_journal(self) -> None:
+        """Open (or create) today's journal note."""
+        if not self.vault:
+            return
+        journal_path = self.vault.ensure_journal_note()
+        self.journal_panel.refresh()
+        self._on_note_selected(journal_path)
 
     # --- Note operations ---
 
