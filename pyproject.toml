@@ -1,0 +1,13 @@
+[project]
+name = "bedrock"
+version = "0.1.0"
+description = "A desktop note editor inspired by Obsidian"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.6",
+    "mistune>=3.0",
+    "whoosh>=2.7",
+]
+
+[project.scripts]
+bedrock = "main:main"
