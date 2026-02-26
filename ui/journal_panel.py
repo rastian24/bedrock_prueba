@@ -1,25 +1,27 @@
 """Journal panel listing journal entries by date."""
 
 import datetime
-import locale
 from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QListWidget, QListWidgetItem,
+    QCalendarWidget,
 )
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QDate
+from PySide6.QtGui import QTextCharFormat, QColor
 
 from core.vault import Vault
 
 
 class JournalPanel(QWidget):
-    """Panel showing a 'Today' button and a list of journal entries sorted newest-first."""
+    """Panel showing a calendar, 'Today' button, and a list of journal entries."""
 
     note_clicked = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.vault: Vault | None = None
+        self._journal_dates: set[datetime.date] = set()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -30,6 +32,13 @@ class JournalPanel(QWidget):
         self.today_btn.setObjectName("journal_today_btn")
         self.today_btn.clicked.connect(self._open_today)
         layout.addWidget(self.today_btn)
+
+        # Calendar
+        self.calendar = QCalendarWidget()
+        self.calendar.setGridVisible(True)
+        self.calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        self.calendar.activated.connect(self._on_date_activated)
+        layout.addWidget(self.calendar)
 
         # List of journal entries
         self.list_widget = QListWidget()
@@ -42,8 +51,9 @@ class JournalPanel(QWidget):
         self.refresh()
 
     def refresh(self) -> None:
-        """Rescan the journal folder and repopulate the list."""
+        """Rescan the journal folder and repopulate the list and calendar highlights."""
         self.list_widget.clear()
+        self._journal_dates.clear()
         if not self.vault:
             return
 
@@ -57,6 +67,7 @@ class JournalPanel(QWidget):
             try:
                 date = datetime.date.fromisoformat(f.stem)
                 entries.append((date, f))
+                self._journal_dates.add(date)
             except ValueError:
                 continue
 
@@ -68,6 +79,21 @@ class JournalPanel(QWidget):
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, str(path))
             self.list_widget.addItem(item)
+
+        self._highlight_calendar_dates()
+
+    def _highlight_calendar_dates(self) -> None:
+        """Highlight dates that have journal entries on the calendar."""
+        # Reset all dates to default format
+        self.calendar.setDateTextFormat(QDate(), QTextCharFormat())
+
+        # Highlight dates with entries
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor("#3a3a5c"))
+        fmt.setForeground(QColor("#7f6df2"))
+        for date in self._journal_dates:
+            qdate = QDate(date.year, date.month, date.day)
+            self.calendar.setDateTextFormat(qdate, fmt)
 
     def _format_date(self, date: datetime.date) -> str:
         """Format a date as a human-readable Spanish string."""
@@ -82,6 +108,16 @@ class JournalPanel(QWidget):
         if not self.vault:
             return
         path = self.vault.ensure_journal_note()
+        self.calendar.setSelectedDate(QDate.currentDate())
+        self.refresh()
+        self.note_clicked.emit(str(path))
+
+    def _on_date_activated(self, qdate: QDate) -> None:
+        """Open or create a journal note for the selected date."""
+        if not self.vault:
+            return
+        date = datetime.date(qdate.year(), qdate.month(), qdate.day())
+        path = self.vault.ensure_journal_note(date)
         self.refresh()
         self.note_clicked.emit(str(path))
 
