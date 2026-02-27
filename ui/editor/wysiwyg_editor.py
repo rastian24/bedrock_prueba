@@ -6,11 +6,17 @@ from PySide6.QtWidgets import QPlainTextEdit, QWidget, QVBoxLayout
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import (
     QTextCursor, QFont, QKeyEvent, QMouseEvent, QFontDatabase,
+    QPixmap, QPainter, QTextBlockFormat,
 )
 
 from core.vault import Vault
+from core.patterns import IMAGE_LINK
 from ui.editor.markdown_highlighter import MarkdownHighlighter
 from ui.editor.wikilink_handler import WikilinkCompleter, find_wikilink_at_position
+
+# Max width for rendered images (pixels)
+IMAGE_MAX_WIDTH = 500
+IMAGE_PADDING = 6
 
 
 class WysiwygEditor(QPlainTextEdit):
@@ -25,6 +31,8 @@ class WysiwygEditor(QPlainTextEdit):
         self.vault: Vault | None = None
         self.current_note: Path | None = None
         self._modified = False
+        self._pixmap_cache: dict[str, QPixmap | None] = {}
+        self._image_block_heights: dict[int, int] = {}  # block_number -> image height
 
         # Font setup
         font = QFont("monospace", 16)
@@ -49,6 +57,9 @@ class WysiwygEditor(QPlainTextEdit):
         self.cursorPositionChanged.connect(self._on_cursor_moved)
         self.textChanged.connect(self._on_text_changed)
 
+        # Update images on scroll
+        self.verticalScrollBar().valueChanged.connect(self.viewport().update)
+
     def set_vault(self, vault: Vault) -> None:
         self.vault = vault
         self.completer.set_vault(vault)
@@ -70,6 +81,9 @@ class WysiwygEditor(QPlainTextEdit):
         cursor.movePosition(QTextCursor.MoveOperation.Start)
         self.setTextCursor(cursor)
         self.highlighter.set_cursor_block(0)
+        self._pixmap_cache.clear()
+        self._image_block_heights.clear()
+        self._update_image_margins()
         self.setFocus()
 
     def save_now(self) -> None:
@@ -86,10 +100,17 @@ class WysiwygEditor(QPlainTextEdit):
         self._modified = True
         self._save_timer.start()
         self.content_changed.emit()
+        self._update_image_margins()
 
     def _on_cursor_moved(self) -> None:
         block_num = self.textCursor().blockNumber()
+        old_block = self.highlighter._cursor_block_number
         self.highlighter.set_cursor_block(block_num)
+        # Update margins when cursor enters/leaves an image block
+        if old_block != block_num:
+            if old_block in self._image_block_heights or block_num in self._image_block_heights:
+                self._update_image_margins()
+                self.viewport().update()
 
     # --- Key handling ---
 
@@ -230,3 +251,103 @@ class WysiwygEditor(QPlainTextEdit):
         else:
             text = line.lstrip()
             cursor.insertText(f"# {text}")
+
+    # --- Image rendering ---
+
+    def _resolve_image_path(self, src: str) -> Path | None:
+        """Resolve an image path relative to the current note."""
+        if not self.current_note:
+            return None
+        path = (self.current_note.parent / src).resolve()
+        if path.is_file():
+            return path
+        # Also try relative to vault root
+        if self.vault:
+            path = (self.vault.path / src).resolve()
+            if path.is_file():
+                return path
+        return None
+
+    def _get_pixmap(self, src: str) -> QPixmap | None:
+        """Load and cache a pixmap for the given image source."""
+        if src in self._pixmap_cache:
+            return self._pixmap_cache[src]
+        resolved = self._resolve_image_path(src)
+        if resolved is None:
+            self._pixmap_cache[src] = None
+            return None
+        pixmap = QPixmap(str(resolved))
+        if pixmap.isNull():
+            self._pixmap_cache[src] = None
+            return None
+        # Scale down if too wide
+        max_w = min(IMAGE_MAX_WIDTH, self.viewport().width() - 20)
+        if pixmap.width() > max_w:
+            pixmap = pixmap.scaledToWidth(max_w, Qt.TransformationMode.SmoothTransformation)
+        self._pixmap_cache[src] = pixmap
+        return pixmap
+
+    def _update_image_margins(self) -> None:
+        """Scan all blocks for image patterns and set bottom margins to reserve space.
+
+        Cursor block gets no margin (shows raw markdown instead of image).
+        """
+        self.blockSignals(True)
+        cursor_block = self.textCursor().blockNumber()
+        doc = self.document()
+        block = doc.begin()
+        new_heights: dict[int, int] = {}
+        while block.isValid():
+            block_num = block.blockNumber()
+            m = IMAGE_LINK.search(block.text())
+            if m:
+                pixmap = self._get_pixmap(m.group(2))
+                if pixmap:
+                    new_heights[block_num] = pixmap.height() + IMAGE_PADDING * 2
+                    if block_num == cursor_block:
+                        # Cursor on this line: no margin, show raw text
+                        self._set_block_margin(block, 0)
+                    else:
+                        # Show image with reserved space
+                        self._set_block_margin(block, new_heights[block_num])
+                else:
+                    self._set_block_margin(block, 0)
+            else:
+                self._set_block_margin(block, 0)
+            block = block.next()
+        self._image_block_heights = new_heights
+        self.blockSignals(False)
+
+    def _set_block_margin(self, block, margin: int) -> None:
+        """Set bottom margin on a block (only if it changed)."""
+        fmt = block.blockFormat()
+        if int(fmt.bottomMargin()) != margin:
+            cursor = QTextCursor(block)
+            fmt.setBottomMargin(margin)
+            cursor.setBlockFormat(fmt)
+
+    def paintEvent(self, event) -> None:
+        """Paint the editor content, then draw images below their reference lines."""
+        super().paintEvent(event)
+        if not self._image_block_heights:
+            return
+        cursor_block = self.textCursor().blockNumber()
+        painter = QPainter(self.viewport())
+        block = self.firstVisibleBlock()
+        while block.isValid():
+            geom = self.blockBoundingGeometry(block).translated(self.contentOffset())
+            if geom.top() > self.viewport().height():
+                break
+            block_num = block.blockNumber()
+            # Only draw image when cursor is NOT on this block
+            if block_num in self._image_block_heights and block_num != cursor_block:
+                m = IMAGE_LINK.search(block.text())
+                if m:
+                    pixmap = self._get_pixmap(m.group(2))
+                    if pixmap:
+                        # Draw image at the top of the block (text is hidden)
+                        y = int(geom.top()) + IMAGE_PADDING
+                        x = 10
+                        painter.drawPixmap(x, y, pixmap)
+            block = block.next()
+        painter.end()

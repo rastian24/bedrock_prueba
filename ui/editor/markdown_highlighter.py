@@ -228,6 +228,17 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             rest_len = length - text_len - 1
             self.setFormat(rest_start, rest_len, marker_fmt)
 
+        # Image links ![alt](path) — hide text on non-cursor lines (image shown instead)
+        for m in patterns.IMAGE_LINK.finditer(region):
+            abs_start = start + m.start()
+            length = m.end() - m.start()
+            fmt = QTextCharFormat()
+            if not is_cursor_line:
+                fmt.setForeground(BG_COLOR)
+            else:
+                fmt.setForeground(GRAY_COLOR)
+            self.setFormat(abs_start, length, fmt)
+
         # Tags
         for m in patterns.TAG.finditer(region):
             abs_start = start + m.start()

@@ -37,3 +37,6 @@ HORIZONTAL_RULE = re.compile(r'^(-{3,}|\*{3,}|_{3,})\s*$', re.MULTILINE)
 
 # Markdown links: [text](url)
 MD_LINK = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
+
+# Image links: ![alt](path)
+IMAGE_LINK = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
