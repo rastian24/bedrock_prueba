@@ -9,7 +9,6 @@ import re
 from PySide6.QtGui import (
     QSyntaxHighlighter, QTextCharFormat, QColor, QFont, QTextDocument,
 )
-from PySide6.QtCore import Qt
 
 from core import patterns
 
@@ -130,6 +129,32 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             fmt = QTextCharFormat()
             fmt.setForeground(GRAY_COLOR)
             self.setFormat(0, len(text), fmt)
+            return
+
+        # Checklist items: - [ ] or - [x]
+        check_m = patterns.CHECKLIST.match(text)
+        if check_m:
+            checked = check_m.group(2).lower() == "x"
+            if not is_cursor_line:
+                prefix_len = len(check_m.group(1))  # "- " part
+                # Collapse "- " to tiny font
+                self.setFormat(0, prefix_len, self._hidden_fmt())
+                # Hide "[ ] " with BG_COLOR but keep normal size to reserve space
+                invis_fmt = QTextCharFormat()
+                invis_fmt.setForeground(BG_COLOR)
+                self.setFormat(prefix_len, check_m.end() - prefix_len, invis_fmt)
+            else:
+                # Cursor line: show raw text, color the marker
+                marker_fmt = QTextCharFormat()
+                marker_fmt.setForeground(GRAY_COLOR)
+                self.setFormat(0, check_m.end(), marker_fmt)
+            # Strikethrough for completed items
+            if checked:
+                done_fmt = QTextCharFormat()
+                done_fmt.setForeground(GRAY_COLOR)
+                done_fmt.setFontStrikeOut(True)
+                self.setFormat(check_m.end(), len(text) - check_m.end(), done_fmt)
+            self._apply_inline(text, is_cursor_line, start=check_m.end())
             return
 
         # List items — color the marker

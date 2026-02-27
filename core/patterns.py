@@ -40,3 +40,6 @@ MD_LINK = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
 
 # Image links: ![alt](path)
 IMAGE_LINK = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
+
+# Checklist items: - [ ] or - [x] (also with * or +)
+CHECKLIST = re.compile(r'^(\s*[-*+]\s+)\[([ xX])\]\s+', re.MULTILINE)

@@ -4,13 +4,14 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QPlainTextEdit, QWidget, QVBoxLayout
 from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import QRectF
 from PySide6.QtGui import (
-    QTextCursor, QFont, QKeyEvent, QMouseEvent, QFontDatabase,
-    QPixmap, QPainter, QTextBlockFormat,
+    QTextCursor, QFont, QKeyEvent, QMouseEvent,
+    QPixmap, QPainter, QColor,
 )
 
 from core.vault import Vault
-from core.patterns import IMAGE_LINK
+from core.patterns import IMAGE_LINK, CHECKLIST
 from ui.editor.markdown_highlighter import MarkdownHighlighter
 from ui.editor.wikilink_handler import WikilinkCompleter, find_wikilink_at_position
 
@@ -179,11 +180,33 @@ class WysiwygEditor(QPlainTextEdit):
             cursor = self.cursorForPosition(click_pos)
             block = cursor.block()
             pos_in_block = cursor.positionInBlock()
+
+            # Toggle checkbox on click
+            check_m = CHECKLIST.match(block.text())
+            if check_m:
+                bracket_pos = len(check_m.group(1))
+                # Click anywhere in the checkbox area (before content starts)
+                if pos_in_block <= check_m.end():
+                    self._toggle_checkbox(block, check_m)
+                    return
+
             target = find_wikilink_at_position(block.text(), pos_in_block)
             if target:
                 self.wikilink_clicked.emit(target)
                 return
         super().mousePressEvent(event)
+
+    def _toggle_checkbox(self, block, check_match) -> None:
+        """Toggle a checklist item between [ ] and [x]."""
+        prefix = check_match.group(1)
+        old_state = check_match.group(2)
+        new_state = " " if old_state.lower() == "x" else "x"
+        # Replace the character inside the brackets
+        cursor = QTextCursor(block)
+        bracket_pos = len(prefix) + 1  # position of the space/x inside [_]
+        cursor.movePosition(QTextCursor.MoveOperation.Right, n=bracket_pos)
+        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, n=1)
+        cursor.insertText(new_state)
 
     # --- Formatting helpers ---
 
@@ -327,10 +350,8 @@ class WysiwygEditor(QPlainTextEdit):
             cursor.setBlockFormat(fmt)
 
     def paintEvent(self, event) -> None:
-        """Paint the editor content, then draw images below their reference lines."""
+        """Paint the editor content, then draw images and checkboxes."""
         super().paintEvent(event)
-        if not self._image_block_heights:
-            return
         cursor_block = self.textCursor().blockNumber()
         painter = QPainter(self.viewport())
         block = self.firstVisibleBlock()
@@ -339,15 +360,41 @@ class WysiwygEditor(QPlainTextEdit):
             if geom.top() > self.viewport().height():
                 break
             block_num = block.blockNumber()
-            # Only draw image when cursor is NOT on this block
-            if block_num in self._image_block_heights and block_num != cursor_block:
-                m = IMAGE_LINK.search(block.text())
-                if m:
-                    pixmap = self._get_pixmap(m.group(2))
-                    if pixmap:
-                        # Draw image at the top of the block (text is hidden)
-                        y = int(geom.top()) + IMAGE_PADDING
-                        x = 10
-                        painter.drawPixmap(x, y, pixmap)
+
+            if block_num != cursor_block:
+                text = block.text()
+
+                # Draw checkbox for checklist items
+                check_m = CHECKLIST.match(text)
+                if check_m:
+                    checked = check_m.group(2).lower() == "x"
+                    symbol = "☑" if checked else "☐"
+                    color = QColor("#7f6df2") if checked else QColor("#999999")
+                    painter.save()
+                    font = QFont(self.font())
+                    font.setPointSize(14)
+                    painter.setFont(font)
+                    painter.setPen(color)
+                    x = int(geom.left()) + 2
+                    y = int(geom.top())
+                    line_h = self.fontMetrics().height()
+                    from PySide6.QtCore import Qt as QtNS
+                    painter.drawText(
+                        QRectF(x, y, 24, line_h),
+                        int(QtNS.AlignmentFlag.AlignVCenter),
+                        symbol,
+                    )
+                    painter.restore()
+
+                # Draw inline image
+                if block_num in self._image_block_heights:
+                    m = IMAGE_LINK.search(text)
+                    if m:
+                        pixmap = self._get_pixmap(m.group(2))
+                        if pixmap:
+                            y = int(geom.top()) + IMAGE_PADDING
+                            x = 10
+                            painter.drawPixmap(x, y, pixmap)
+
             block = block.next()
         painter.end()
