@@ -1,7 +1,7 @@
 """Cursor-aware Markdown syntax highlighter for QPlainTextEdit.
 
-On lines WITHOUT the cursor, markup markers (**, *, `, [[, ]]) are painted
-with the background color (invisible). On the cursor line, they show in gray.
+On lines WITHOUT the cursor, markup markers (**, *, `, [[, ]]) are hidden
+(tiny font + background color). On the cursor line, they show in gray.
 """
 
 import re
@@ -21,6 +21,9 @@ TAG_COLOR = QColor("#e5c07b")
 GRAY_COLOR = QColor("#666666")
 CODE_BG = QColor("#2a2a2a")
 BLOCKQUOTE_COLOR = QColor("#999999")
+
+# Font size used to collapse hidden markers to near-zero width
+_HIDDEN_FONT_SIZE = 1
 
 # State constants
 STATE_NORMAL = 0
@@ -48,6 +51,25 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             block = doc.findBlockByNumber(block_number)
             if block.isValid():
                 self.rehighlightBlock(block)
+
+    def _hidden_fmt(self, base: QTextCharFormat | None = None) -> QTextCharFormat:
+        """Return a format that hides markers: background-colored and tiny font."""
+        fmt = QTextCharFormat(base) if base else QTextCharFormat()
+        fmt.setForeground(BG_COLOR)
+        fmt.setFontPointSize(_HIDDEN_FONT_SIZE)
+        return fmt
+
+    def _visible_marker_fmt(self, base: QTextCharFormat | None = None) -> QTextCharFormat:
+        """Return a format for markers on the cursor line: gray, normal size."""
+        fmt = QTextCharFormat(base) if base else QTextCharFormat()
+        fmt.setForeground(GRAY_COLOR)
+        return fmt
+
+    def _marker_fmt(self, is_cursor_line: bool, base: QTextCharFormat | None = None) -> QTextCharFormat:
+        """Return hidden or visible marker format depending on cursor position."""
+        if is_cursor_line:
+            return self._visible_marker_fmt(base)
+        return self._hidden_fmt(base)
 
     def highlightBlock(self, text: str) -> None:
         block_num = self.currentBlock().blockNumber()
@@ -86,11 +108,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             # Apply to entire line
             self.setFormat(0, len(text), fmt)
             # Hide the # markers on non-cursor lines
-            marker_fmt = QTextCharFormat(fmt)
-            if not is_cursor_line:
-                marker_fmt.setForeground(BG_COLOR)
-            else:
-                marker_fmt.setForeground(GRAY_COLOR)
+            marker_fmt = self._marker_fmt(is_cursor_line, fmt)
             self.setFormat(0, len(m.group(1)) + 1, marker_fmt)
             # Still process inline formatting within headings
             self._apply_inline(text, is_cursor_line, start=m.start(2))
@@ -103,11 +121,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             fmt.setForeground(BLOCKQUOTE_COLOR)
             fmt.setFontItalic(True)
             self.setFormat(0, len(text), fmt)
-            marker_fmt = QTextCharFormat(fmt)
-            if not is_cursor_line:
-                marker_fmt.setForeground(BG_COLOR)
-            else:
-                marker_fmt.setForeground(GRAY_COLOR)
+            marker_fmt = self._marker_fmt(is_cursor_line, fmt)
             self.setFormat(0, bq.end(), marker_fmt)
             return
 
@@ -118,12 +132,13 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             self.setFormat(0, len(text), fmt)
             return
 
-        # List items
+        # List items — color the marker
         list_m = re.match(r'^(\s*)([-*+]|\d+\.)\s+', text)
         if list_m:
-            fmt = QTextCharFormat()
-            fmt.setForeground(ACCENT_COLOR)
-            self.setFormat(list_m.start(2), len(list_m.group(2)), fmt)
+            marker_fmt = QTextCharFormat()
+            marker_fmt.setForeground(ACCENT_COLOR)
+            marker_fmt.setFontWeight(QFont.Weight.Bold)
+            self.setFormat(list_m.start(2), len(list_m.group(2)), marker_fmt)
 
         # Apply inline formatting
         self._apply_inline(text, is_cursor_line)
@@ -141,11 +156,13 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             code_fmt.setForeground(TEXT_COLOR)
             self.setFormat(abs_start, m.end() - m.start(), code_fmt)
             # Hide backticks
-            marker_fmt = QTextCharFormat(code_fmt)
-            if not is_cursor_line:
-                marker_fmt.setForeground(CODE_BG)
-            else:
+            marker_fmt = self._marker_fmt(is_cursor_line, code_fmt)
+            if is_cursor_line:
                 marker_fmt.setForeground(GRAY_COLOR)
+            else:
+                # Keep code background for hidden backticks so they blend
+                marker_fmt.setForeground(CODE_BG)
+                marker_fmt.setFontPointSize(_HIDDEN_FONT_SIZE)
             self.setFormat(abs_start, 1, marker_fmt)
             self.setFormat(abs_start + m.end() - m.start() - 1, 1, marker_fmt)
 
@@ -159,11 +176,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             fmt.setForeground(TEXT_COLOR)
             self.setFormat(abs_start, length, fmt)
             # Hide markers
-            marker_fmt = QTextCharFormat(fmt)
-            if not is_cursor_line:
-                marker_fmt.setForeground(BG_COLOR)
-            else:
-                marker_fmt.setForeground(GRAY_COLOR)
+            marker_fmt = self._marker_fmt(is_cursor_line, fmt)
             self.setFormat(abs_start, marker_len, marker_fmt)
             self.setFormat(abs_start + length - marker_len, marker_len, marker_fmt)
 
@@ -176,11 +189,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             fmt.setForeground(TEXT_COLOR)
             self.setFormat(abs_start, length, fmt)
             # Hide markers
-            marker_fmt = QTextCharFormat(fmt)
-            if not is_cursor_line:
-                marker_fmt.setForeground(BG_COLOR)
-            else:
-                marker_fmt.setForeground(GRAY_COLOR)
+            marker_fmt = self._marker_fmt(is_cursor_line, fmt)
             self.setFormat(abs_start, 1, marker_fmt)
             self.setFormat(abs_start + length - 1, 1, marker_fmt)
 
@@ -193,12 +202,8 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             fmt.setFontUnderline(True)
             self.setFormat(abs_start, length, fmt)
             # Hide [[ and ]] markers
-            marker_fmt = QTextCharFormat(fmt)
+            marker_fmt = self._marker_fmt(is_cursor_line, fmt)
             marker_fmt.setFontUnderline(False)
-            if not is_cursor_line:
-                marker_fmt.setForeground(BG_COLOR)
-            else:
-                marker_fmt.setForeground(GRAY_COLOR)
             self.setFormat(abs_start, 2, marker_fmt)
             self.setFormat(abs_start + length - 2, 2, marker_fmt)
 
@@ -216,11 +221,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             self.setFormat(text_start, text_len, link_fmt)
 
             # Hide the markup around it
-            marker_fmt = QTextCharFormat()
-            if not is_cursor_line:
-                marker_fmt.setForeground(BG_COLOR)
-            else:
-                marker_fmt.setForeground(GRAY_COLOR)
+            marker_fmt = self._marker_fmt(is_cursor_line)
             # [ before text
             self.setFormat(abs_start, 1, marker_fmt)
             # ](url) after text
@@ -232,11 +233,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         for m in patterns.IMAGE_LINK.finditer(region):
             abs_start = start + m.start()
             length = m.end() - m.start()
-            fmt = QTextCharFormat()
-            if not is_cursor_line:
-                fmt.setForeground(BG_COLOR)
-            else:
-                fmt.setForeground(GRAY_COLOR)
+            fmt = self._marker_fmt(is_cursor_line)
             self.setFormat(abs_start, length, fmt)
 
         # Tags
