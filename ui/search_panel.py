@@ -52,7 +52,7 @@ class SearchDialog(QDialog):
         super().__init__(parent)
         self.vault = vault
         self.setWindowTitle("Quick Open")
-        self.setWindowFlags(Qt.WindowType.Popup)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setFixedSize(500, 350)
 
         layout = QVBoxLayout(self)

@@ -292,6 +292,8 @@ class MainWindow(QMainWindow):
 
     def _on_tag_clicked(self, tag: str) -> None:
         notes = self.vault_index.get_notes_for_tag(tag)
+        if self.search_engine:
+            self.vault_search_panel.set_search_engine(self.search_engine)
         self.vault_search_panel.show_tag_results(tag, notes)
         self.vault_search_panel.setVisible(True)
         self.backlinks_panel.setVisible(False)
