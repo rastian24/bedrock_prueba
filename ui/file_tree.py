@@ -121,17 +121,20 @@ class FileTree(QWidget):
     def _context_menu(self, pos) -> None:
         menu = QMenu(self)
 
+        idx = self.tree.indexAt(pos)
+        # Determine target folder from the clicked item, not from selection
+        target_folder = self._folder_from_index(idx)
+
         new_note_action = QAction("New Note", self)
-        new_note_action.triggered.connect(self._new_note)
+        new_note_action.triggered.connect(lambda: self._new_note(target_folder))
         menu.addAction(new_note_action)
 
         new_folder_action = QAction("New Folder", self)
-        new_folder_action.triggered.connect(self._new_folder)
+        new_folder_action.triggered.connect(lambda: self._new_folder(target_folder))
         menu.addAction(new_folder_action)
 
         menu.addSeparator()
 
-        idx = self.tree.indexAt(pos)
         if idx.isValid():
             rename_action = QAction("Rename", self)
             rename_action.triggered.connect(lambda: self._rename(idx))
@@ -143,22 +146,34 @@ class FileTree(QWidget):
 
         menu.exec(self.tree.viewport().mapToGlobal(pos))
 
-    def _new_note(self) -> None:
+    def _folder_from_index(self, proxy_index: QModelIndex) -> Path | None:
+        """Return the folder for a given proxy index (or vault root if invalid)."""
+        if not self.vault:
+            return None
+        if not proxy_index.isValid():
+            return self.vault.path
+        source_idx = self.proxy.mapToSource(proxy_index)
+        path = Path(self.fs_model.filePath(source_idx))
+        return path if path.is_dir() else path.parent
+
+    def _new_note(self, folder: Path | None = None) -> None:
         if not self.vault:
             return
+        if folder is None:
+            folder = self.current_folder()
         name, ok = QInputDialog.getText(self, "New Note", "Note name:")
         if ok and name.strip():
-            folder = self.current_folder()
             path = self.vault.create_note(name.strip(), folder)
             self._refresh_proxy()
             self.note_created.emit(str(path))
 
-    def _new_folder(self) -> None:
+    def _new_folder(self, folder: Path | None = None) -> None:
         if not self.vault:
             return
+        if folder is None:
+            folder = self.current_folder()
         name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
         if ok and name.strip():
-            folder = self.current_folder()
             self.vault.create_folder(name.strip(), folder)
             self._refresh_proxy()
 
