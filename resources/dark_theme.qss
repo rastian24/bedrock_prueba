@@ -55,13 +55,13 @@ QTreeView::branch {
 
 QTreeView::branch:has-children:!has-siblings:closed,
 QTreeView::branch:closed:has-children:has-siblings {
-    image: none;
+    image: url(resources/icons/branch-closed.svg);
     border-image: none;
 }
 
 QTreeView::branch:open:has-children:!has-siblings,
 QTreeView::branch:open:has-children:has-siblings {
-    image: none;
+    image: url(resources/icons/branch-open.svg);
     border-image: none;
 }
 
