@@ -8,11 +8,36 @@ from typing import Any
 CONFIG_DIR = Path.home() / ".config" / "bedrock"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
+DEFAULT_HOTKEYS: dict[str, str] = {
+    "toggle_left_sidebar": "Ctrl+\\",
+    "toggle_right_sidebar": "Ctrl+Shift+\\",
+    "new_note": "Ctrl+N",
+    "quick_open": "Ctrl+P",
+    "vault_search": "Ctrl+Shift+F",
+    "find": "Ctrl+F",
+    "change_vault": "Ctrl+Shift+O",
+    "today_journal": "Ctrl+D",
+    "settings": "Ctrl+,",
+}
+
+HOTKEY_LABELS: dict[str, str] = {
+    "toggle_left_sidebar": "Toggle left sidebar",
+    "toggle_right_sidebar": "Toggle right sidebar",
+    "new_note": "New note",
+    "quick_open": "Quick open (by filename)",
+    "vault_search": "Search in vault (full text)",
+    "find": "Find / Search",
+    "change_vault": "Change vault",
+    "today_journal": "Open today's journal",
+    "settings": "Open settings",
+}
+
 _DEFAULTS: dict[str, Any] = {
     "last_vault": None,
     "recent_vaults": [],
     "window_geometry": None,
     "window_state": None,
+    "hotkeys": {},
 }
 
 
@@ -61,3 +86,13 @@ class Config:
     @property
     def recent_vaults(self) -> list[str]:
         return self._data.get("recent_vaults", [])
+
+    def get_hotkeys(self) -> dict[str, str]:
+        """Return effective hotkeys (user overrides merged with defaults)."""
+        return {**DEFAULT_HOTKEYS, **self._data.get("hotkeys", {})}
+
+    def set_hotkeys(self, hotkeys: dict[str, str]) -> None:
+        """Save only user-overridden hotkeys (keys that differ from defaults)."""
+        overrides = {k: v for k, v in hotkeys.items() if v != DEFAULT_HOTKEYS.get(k)}
+        self._data["hotkeys"] = overrides
+        self.save()

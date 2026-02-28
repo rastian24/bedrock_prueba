@@ -20,6 +20,8 @@ from ui.backlinks_panel import BacklinksPanel
 from ui.tag_panel import TagPanel
 from ui.search_panel import SearchDialog, VaultSearchPanel
 from ui.journal_panel import JournalPanel
+from ui.settings_dialog import SettingsDialog
+from ui.find_bar import FindBar
 
 
 class IndexWorker(QThread):
@@ -82,8 +84,16 @@ class MainWindow(QMainWindow):
         self.left_sidebar.addTab(explorer_tab, "Explorer")
         self.left_sidebar.addTab(self.journal_panel, "Journal")
 
-        # Editor
+        # Editor + find bar container
+        editor_container = QWidget()
+        editor_layout = QVBoxLayout(editor_container)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
         self.editor = WysiwygEditor()
+        self.find_bar = FindBar(self.editor)
+        self.find_bar.setVisible(False)
+        editor_layout.addWidget(self.editor)
+        editor_layout.addWidget(self.find_bar)
 
         # Right sidebar
         self.right_sidebar = QWidget()
@@ -101,7 +111,7 @@ class MainWindow(QMainWindow):
         # Splitter
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.left_sidebar)
-        self.splitter.addWidget(self.editor)
+        self.splitter.addWidget(editor_container)
         self.splitter.addWidget(self.right_sidebar)
         self.splitter.setSizes([250, 600, 280])
         self.splitter.setStretchFactor(0, 0)
@@ -132,20 +142,31 @@ class MainWindow(QMainWindow):
         self.vault_search_panel.note_clicked.connect(self._on_note_selected)
 
     def _setup_shortcuts(self) -> None:
-        # Toggle left sidebar
-        QShortcut(QKeySequence("Ctrl+\\"), self, self._toggle_left_sidebar)
-        # Toggle right sidebar
-        QShortcut(QKeySequence("Ctrl+Shift+\\"), self, self._toggle_right_sidebar)
-        # New note
-        QShortcut(QKeySequence("Ctrl+N"), self, self._new_note)
-        # Quick open
-        QShortcut(QKeySequence("Ctrl+P"), self, self._quick_open)
-        # Vault search
-        QShortcut(QKeySequence("Ctrl+Shift+F"), self, self._vault_search)
-        # Change vault
-        QShortcut(QKeySequence("Ctrl+Shift+O"), self, self._change_vault)
-        # Open today's journal
-        QShortcut(QKeySequence("Ctrl+D"), self, self._open_today_journal)
+        self._shortcuts: dict[str, QShortcut] = {}
+        self._apply_hotkeys(self.config.get_hotkeys())
+
+    _HOTKEY_ACTIONS: dict[str, str] = {
+        "toggle_left_sidebar": "_toggle_left_sidebar",
+        "toggle_right_sidebar": "_toggle_right_sidebar",
+        "new_note": "_new_note",
+        "quick_open": "_quick_open",
+        "vault_search": "_vault_search",
+        "find": "_find_in_note",
+        "change_vault": "_change_vault",
+        "today_journal": "_open_today_journal",
+        "settings": "_open_settings",
+    }
+
+    def _apply_hotkeys(self, hotkeys: dict[str, str]) -> None:
+        """Bind or rebind all shortcuts from the given hotkey map."""
+        for action, method_name in self._HOTKEY_ACTIONS.items():
+            seq = hotkeys.get(action, "")
+            if action in self._shortcuts:
+                self._shortcuts[action].setKey(QKeySequence(seq))
+            else:
+                sc = QShortcut(QKeySequence(seq), self)
+                sc.activated.connect(getattr(self, method_name))
+                self._shortcuts[action] = sc
 
     def _toggle_left_sidebar(self) -> None:
         self.left_sidebar.setVisible(not self.left_sidebar.isVisible())
@@ -193,6 +214,14 @@ class MainWindow(QMainWindow):
     def _change_vault(self) -> None:
         self.editor.save_now()
         self._show_vault_selector()
+
+    def _find_in_note(self) -> None:
+        self.find_bar.show_and_focus()
+
+    def _open_settings(self) -> None:
+        dialog = SettingsDialog(self.config, self)
+        dialog.hotkeys_changed.connect(self._apply_hotkeys)
+        dialog.exec()
 
     def _open_vault(self, path: str) -> None:
         self.vault = Vault(path)
