@@ -22,6 +22,7 @@ from ui.search_panel import SearchDialog, VaultSearchPanel
 from ui.journal_panel import JournalPanel
 from ui.settings_dialog import SettingsDialog
 from ui.find_bar import FindBar
+from ui.graph_view import GraphView
 
 
 class IndexWorker(QThread):
@@ -95,18 +96,34 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self.editor)
         editor_layout.addWidget(self.find_bar)
 
-        # Right sidebar
+        # Right sidebar — top panel toggles between backlinks and vault search
+        right_top = QWidget()
+        right_top_layout = QVBoxLayout(right_top)
+        right_top_layout.setContentsMargins(0, 0, 0, 0)
+        right_top_layout.setSpacing(0)
+        self.backlinks_panel = BacklinksPanel()
+        right_top_layout.addWidget(self.backlinks_panel)
+
+        self.vault_search_panel = VaultSearchPanel()
+        self.vault_search_panel.setVisible(False)
+        right_top_layout.addWidget(self.vault_search_panel)
+
+        # Graph view — always visible below backlinks
+        self.graph_view = GraphView()
+
+        # Vertical splitter inside the right sidebar
+        right_vsplitter = QSplitter(Qt.Orientation.Vertical)
+        right_vsplitter.addWidget(right_top)
+        right_vsplitter.addWidget(self.graph_view)
+        right_vsplitter.setSizes([250, 300])
+        right_vsplitter.setChildrenCollapsible(False)
+
         self.right_sidebar = QWidget()
         self.right_sidebar.setObjectName("sidebar_right")
         right_layout = QVBoxLayout(self.right_sidebar)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        self.backlinks_panel = BacklinksPanel()
-        right_layout.addWidget(self.backlinks_panel)
-
-        # Vault search panel (hidden initially, replaces right sidebar content)
-        self.vault_search_panel = VaultSearchPanel()
-        self.vault_search_panel.setVisible(False)
-        right_layout.addWidget(self.vault_search_panel)
+        right_layout.setSpacing(0)
+        right_layout.addWidget(right_vsplitter)
 
         # Splitter
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -140,6 +157,7 @@ class MainWindow(QMainWindow):
         self.tag_panel.tag_clicked.connect(self._on_tag_clicked)
         self.journal_panel.note_clicked.connect(self._on_note_selected)
         self.vault_search_panel.note_clicked.connect(self._on_note_selected)
+        self.graph_view.note_clicked.connect(self._on_note_selected)
 
     def _setup_shortcuts(self) -> None:
         self._shortcuts: dict[str, QShortcut] = {}
@@ -258,6 +276,8 @@ class MainWindow(QMainWindow):
         self._update_backlinks()
         self._update_tags()
         self.journal_panel.refresh()
+        if self.vault:
+            self.graph_view.set_graph(self.vault, self.vault_index)
 
     # --- Journal ---
 
@@ -281,6 +301,7 @@ class MainWindow(QMainWindow):
         self.file_label.setText(path.name)
         self._update_word_count()
         self._update_backlinks()
+        self.graph_view.set_current_note(path)
 
     def _on_note_saved(self, path: str) -> None:
         note_path = Path(path)
@@ -291,6 +312,8 @@ class MainWindow(QMainWindow):
             self.search_engine.update_note(note_path)
         self._update_backlinks()
         self._update_tags()
+        if self.vault:
+            self.graph_view.set_graph(self.vault, self.vault_index)
 
     def _update_word_count(self) -> None:
         text = self.editor.toPlainText()

@@ -69,6 +69,11 @@ class VaultIndex:
         with self._lock:
             return sorted(self._tag_index.get(tag, set()))
 
+    def get_all_outgoing_links(self) -> dict[Path, list[str]]:
+        """Return a snapshot of all outgoing links (note_path -> [target_stem])."""
+        with self._lock:
+            return {k: list(v) for k, v in self._outgoing_links.items()}
+
     def _index_note_unlocked(self, note_path: Path) -> None:
         """Index a single note (must be called with lock held)."""
         try:
