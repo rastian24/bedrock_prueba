@@ -114,31 +114,26 @@ class MainWindow(QMainWindow):
 
         self.backlinks_panel = BacklinksPanel()
         self.vault_search_panel = VaultSearchPanel()
-        self.vault_search_panel.setVisible(False)
         self.graph_view = GraphView()
 
-        # Backlinks/Search share the same container (toggled programmatically)
-        self._right_top = QWidget()
-        right_top_layout = QVBoxLayout(self._right_top)
-        right_top_layout.setContentsMargins(0, 0, 0, 0)
-        right_top_layout.setSpacing(0)
-        right_top_layout.addWidget(self.backlinks_panel)
-        right_top_layout.addWidget(self.vault_search_panel)
-
+        # Search starts collapsed; Backlinks and Graph start open
         self._right_sections: list[tuple[QPushButton, QWidget]] = []
-        for label, panel, stretch in [
-            ("Backlinks", self._right_top, 1),
-            ("Graph", self.graph_view, 1),
+        for label, panel, stretch, open_ in [
+            ("Backlinks", self.backlinks_panel, 1, True),
+            ("Search", self.vault_search_panel, 1, False),
+            ("Graph", self.graph_view, 1, True),
         ]:
-            btn = QPushButton(f"▼  {label}")
+            arrow = "▼" if open_ else "▶"
+            btn = QPushButton(f"{arrow}  {label}")
             btn.setObjectName("section_toggle_btn")
             btn.setCheckable(True)
-            btn.setChecked(True)
+            btn.setChecked(open_)
             btn.clicked.connect(
                 lambda checked, b=btn, p=panel, lbl=label: self._toggle_right_section(checked, b, lbl, p)
             )
             right_layout.addWidget(btn)
             right_layout.addWidget(panel, stretch=stretch)
+            panel.setVisible(open_)
             self._right_sections.append((btn, panel))
 
         # Splitter
@@ -228,13 +223,13 @@ class MainWindow(QMainWindow):
         arrow = "▼" if checked else "▶"
         btn.setText(f"{arrow}  {label}")
 
-    def _expand_backlinks_section(self) -> None:
-        """Ensure the Backlinks section in the right sidebar is visible."""
+    def _expand_search_section(self) -> None:
+        """Ensure the Search section in the right sidebar is visible."""
         for btn, panel in self._right_sections:
-            if panel is self._right_top and not btn.isChecked():
+            if panel is self.vault_search_panel and not btn.isChecked():
                 btn.setChecked(True)
-                self._right_top.setVisible(True)
-                btn.setText("▼  Backlinks")
+                self.vault_search_panel.setVisible(True)
+                btn.setText("▼  Search")
                 break
 
     def _restore_geometry(self) -> None:
@@ -392,10 +387,8 @@ class MainWindow(QMainWindow):
         if self.search_engine:
             self.vault_search_panel.set_search_engine(self.search_engine)
         self.vault_search_panel.show_tag_results(tag, notes)
-        self.vault_search_panel.setVisible(True)
-        self.backlinks_panel.setVisible(False)
         self.right_sidebar.setVisible(True)
-        self._expand_backlinks_section()
+        self._expand_search_section()
 
     # --- New note ---
 
@@ -421,8 +414,6 @@ class MainWindow(QMainWindow):
         if not self.vault or not self.search_engine:
             return
         self.vault_search_panel.set_search_engine(self.search_engine)
-        self.vault_search_panel.setVisible(True)
-        self.backlinks_panel.setVisible(False)
         self.right_sidebar.setVisible(True)
-        self._expand_backlinks_section()
+        self._expand_search_section()
         self.vault_search_panel.focus_search()
