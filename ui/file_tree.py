@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTreeView, QMenu, QInputDialog,
-    QMessageBox, QLabel,
+    QMessageBox,
 )
 from PySide6.QtCore import (
     Qt, Signal, QSortFilterProxyModel, QModelIndex,
@@ -51,11 +51,6 @@ class FileTree(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
-        # Header
-        header = QLabel("EXPLORER")
-        header.setObjectName("section_header")
-        layout.addWidget(header)
 
         # Tree view
         self.tree = QTreeView()

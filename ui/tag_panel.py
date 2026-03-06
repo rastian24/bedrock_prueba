@@ -1,7 +1,7 @@
 """Tag panel showing all tags in the vault with occurrence counts."""
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QWidget, QVBoxLayout, QListWidget, QListWidgetItem,
 )
 from PySide6.QtCore import Signal, Qt
 
@@ -16,10 +16,6 @@ class TagPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
-        header = QLabel("TAGS")
-        header.setObjectName("section_header")
-        layout.addWidget(header)
 
         self.list_widget = QListWidget()
         self.list_widget.itemClicked.connect(self._on_item_clicked)

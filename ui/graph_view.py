@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
     QGraphicsTextItem,
     QGraphicsView,
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -369,9 +368,6 @@ class GraphView(QWidget):
         hlayout = QHBoxLayout(header_row)
         hlayout.setContentsMargins(12, 0, 8, 0)
 
-        title = QLabel("GRAPH")
-        title.setObjectName("section_header")
-        hlayout.addWidget(title)
         hlayout.addStretch()
 
         self._refresh_btn = QPushButton("↺")

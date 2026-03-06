@@ -19,10 +19,6 @@ class BacklinksPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        header = QLabel("BACKLINKS")
-        header.setObjectName("section_header")
-        layout.addWidget(header)
-
         self.list_widget = QListWidget()
         self.list_widget.itemClicked.connect(self._on_item_clicked)
         layout.addWidget(self.list_widget)

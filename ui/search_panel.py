@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem,
-    QWidget, QLabel,
+    QWidget,
 )
 from PySide6.QtCore import Signal, Qt, QTimer
 
@@ -133,10 +133,6 @@ class VaultSearchPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
-        header = QLabel("SEARCH")
-        header.setObjectName("section_header")
-        layout.addWidget(header)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search in vault...")
