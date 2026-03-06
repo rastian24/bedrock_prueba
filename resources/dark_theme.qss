@@ -21,6 +21,15 @@ QSplitter::handle {
     width: 1px;
 }
 
+QSplitter::handle:vertical {
+    background-color: #2d2d2d;
+    height: 4px;
+}
+
+QSplitter::handle:vertical:hover {
+    background-color: #7f6df2;
+}
+
 /* Sidebar panels */
 QWidget#sidebar_left, QWidget#sidebar_right {
     background-color: #252525;

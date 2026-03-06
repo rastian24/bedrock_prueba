@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QStatusBar,
-    QLabel, QMessageBox, QInputDialog, QPushButton,
+    QLabel, QMessageBox, QInputDialog,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QByteArray
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -23,6 +23,7 @@ from ui.journal_panel import JournalPanel
 from ui.settings_dialog import SettingsDialog
 from ui.find_bar import FindBar
 from ui.graph_view import GraphView
+from ui.sidebar import SidebarPanel
 
 
 class IndexWorker(QThread):
@@ -65,34 +66,15 @@ class MainWindow(QMainWindow):
         self._open_initial_vault()
 
     def _setup_ui(self) -> None:
-        # Left sidebar — all sections are collapsible, at least one stays open
-        self.left_sidebar = QWidget()
+        # Left sidebar
+        self.left_sidebar = SidebarPanel()
         self.left_sidebar.setObjectName("sidebar_left")
-        left_layout = QVBoxLayout(self.left_sidebar)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
-
         self.file_tree = FileTree()
         self.tag_panel = TagPanel()
         self.journal_panel = JournalPanel()
-
-        # (label, widget, stretch) — stretch=0 means natural size
-        self._sidebar_sections: list[tuple[QPushButton, QWidget]] = []
-        for label, panel, stretch in [
-            ("Explorer", self.file_tree, 3),
-            ("Tags", self.tag_panel, 1),
-            ("Journal", self.journal_panel, 2),
-        ]:
-            btn = QPushButton(f"▼  {label}")
-            btn.setObjectName("section_toggle_btn")
-            btn.setCheckable(True)
-            btn.setChecked(True)
-            btn.clicked.connect(
-                lambda checked, b=btn, p=panel, lbl=label: self._toggle_section(checked, b, lbl, p)
-            )
-            left_layout.addWidget(btn)
-            left_layout.addWidget(panel, stretch=stretch)
-            self._sidebar_sections.append((btn, panel))
+        self.left_sidebar.add_section("Explorer", self.file_tree)
+        self.left_sidebar.add_section("Tags", self.tag_panel)
+        self.left_sidebar.add_section("Journal", self.journal_panel)
 
         # Editor + find bar container
         editor_container = QWidget()
@@ -105,36 +87,15 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self.editor)
         editor_layout.addWidget(self.find_bar)
 
-        # Right sidebar — sections are collapsible, at least one stays open
-        self.right_sidebar = QWidget()
+        # Right sidebar — Search starts collapsed
+        self.right_sidebar = SidebarPanel()
         self.right_sidebar.setObjectName("sidebar_right")
-        right_layout = QVBoxLayout(self.right_sidebar)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-
         self.backlinks_panel = BacklinksPanel()
         self.vault_search_panel = VaultSearchPanel()
         self.graph_view = GraphView()
-
-        # Search starts collapsed; Backlinks and Graph start open
-        self._right_sections: list[tuple[QPushButton, QWidget]] = []
-        for label, panel, stretch, open_ in [
-            ("Backlinks", self.backlinks_panel, 1, True),
-            ("Search", self.vault_search_panel, 1, False),
-            ("Graph", self.graph_view, 1, True),
-        ]:
-            arrow = "▼" if open_ else "▶"
-            btn = QPushButton(f"{arrow}  {label}")
-            btn.setObjectName("section_toggle_btn")
-            btn.setCheckable(True)
-            btn.setChecked(open_)
-            btn.clicked.connect(
-                lambda checked, b=btn, p=panel, lbl=label: self._toggle_right_section(checked, b, lbl, p)
-            )
-            right_layout.addWidget(btn)
-            right_layout.addWidget(panel, stretch=stretch)
-            panel.setVisible(open_)
-            self._right_sections.append((btn, panel))
+        self.right_sidebar.add_section("Backlinks", self.backlinks_panel)
+        self.right_sidebar.add_section("Search", self.vault_search_panel, expanded=False)
+        self.right_sidebar.add_section("Graph", self.graph_view)
 
         # Splitter
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -203,34 +164,8 @@ class MainWindow(QMainWindow):
     def _toggle_right_sidebar(self) -> None:
         self.right_sidebar.setVisible(not self.right_sidebar.isVisible())
 
-    def _toggle_section(self, checked: bool, btn: QPushButton, label: str, panel: QWidget) -> None:
-        if not checked:
-            any_open = any(b.isChecked() for b, _ in self._sidebar_sections if b is not btn)
-            if not any_open:
-                btn.setChecked(True)
-                return
-        panel.setVisible(checked)
-        arrow = "▼" if checked else "▶"
-        btn.setText(f"{arrow}  {label}")
-
-    def _toggle_right_section(self, checked: bool, btn: QPushButton, label: str, panel: QWidget) -> None:
-        if not checked:
-            any_open = any(b.isChecked() for b, _ in self._right_sections if b is not btn)
-            if not any_open:
-                btn.setChecked(True)
-                return
-        panel.setVisible(checked)
-        arrow = "▼" if checked else "▶"
-        btn.setText(f"{arrow}  {label}")
-
     def _expand_search_section(self) -> None:
-        """Ensure the Search section in the right sidebar is visible."""
-        for btn, panel in self._right_sections:
-            if panel is self.vault_search_panel and not btn.isChecked():
-                btn.setChecked(True)
-                self.vault_search_panel.setVisible(True)
-                btn.setText("▼  Search")
-                break
+        self.right_sidebar.expand_section(self.vault_search_panel)
 
     def _restore_geometry(self) -> None:
         geom = self.config.get("window_geometry")
