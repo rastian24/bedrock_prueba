@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QStatusBar,
-    QLabel, QMessageBox, QInputDialog, QTabWidget,
+    QLabel, QMessageBox, QInputDialog, QPushButton,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QByteArray
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -65,25 +65,27 @@ class MainWindow(QMainWindow):
         self._open_initial_vault()
 
     def _setup_ui(self) -> None:
-        # Left sidebar with tabs
-        self.left_sidebar = QTabWidget()
+        # Left sidebar — file explorer, tags and journal as collapsible section
+        self.left_sidebar = QWidget()
         self.left_sidebar.setObjectName("sidebar_left")
+        left_layout = QVBoxLayout(self.left_sidebar)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
 
-        # Explorer tab (file tree + tags)
-        explorer_tab = QWidget()
-        explorer_layout = QVBoxLayout(explorer_tab)
-        explorer_layout.setContentsMargins(0, 0, 0, 0)
-        explorer_layout.setSpacing(0)
         self.file_tree = FileTree()
         self.tag_panel = TagPanel()
-        explorer_layout.addWidget(self.file_tree, stretch=3)
-        explorer_layout.addWidget(self.tag_panel, stretch=1)
+        left_layout.addWidget(self.file_tree, stretch=3)
+        left_layout.addWidget(self.tag_panel, stretch=1)
 
-        # Journal tab
+        # Journal section — collapsible
+        self._journal_toggle_btn = QPushButton("▼  Journal")
+        self._journal_toggle_btn.setObjectName("section_toggle_btn")
+        self._journal_toggle_btn.setCheckable(True)
+        self._journal_toggle_btn.setChecked(True)
+        self._journal_toggle_btn.clicked.connect(self._toggle_journal_section)
         self.journal_panel = JournalPanel()
-
-        self.left_sidebar.addTab(explorer_tab, "Explorer")
-        self.left_sidebar.addTab(self.journal_panel, "Journal")
+        left_layout.addWidget(self._journal_toggle_btn)
+        left_layout.addWidget(self.journal_panel)
 
         # Editor + find bar container
         editor_container = QWidget()
@@ -191,6 +193,11 @@ class MainWindow(QMainWindow):
 
     def _toggle_right_sidebar(self) -> None:
         self.right_sidebar.setVisible(not self.right_sidebar.isVisible())
+
+    def _toggle_journal_section(self, checked: bool) -> None:
+        self.journal_panel.setVisible(checked)
+        arrow = "▼" if checked else "▶"
+        self._journal_toggle_btn.setText(f"{arrow}  Journal")
 
     def _restore_geometry(self) -> None:
         geom = self.config.get("window_geometry")

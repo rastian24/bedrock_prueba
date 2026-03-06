@@ -246,6 +246,28 @@ QLabel#section_header {
     padding: 8px 8px 4px 8px;
 }
 
+/* Section toggle button in sidebar */
+QPushButton#section_toggle_btn {
+    background-color: #252525;
+    color: #999999;
+    border: none;
+    border-top: 1px solid #333333;
+    border-radius: 0;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    text-align: left;
+}
+
+QPushButton#section_toggle_btn:hover {
+    background-color: #2a2a2a;
+    color: #dcddde;
+}
+
+QPushButton#section_toggle_btn:checked {
+    color: #dcddde;
+}
+
 /* Tab Widget */
 QTabWidget::pane {
     border: none;
