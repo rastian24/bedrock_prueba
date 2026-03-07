@@ -58,7 +58,7 @@ class JournalPanel(QWidget):
         if not self.vault:
             return
 
-        journal_dir = self.vault.path / "journal"
+        journal_dir = self.vault.path / ".journal"
         if not journal_dir.is_dir():
             return
 
@@ -119,7 +119,7 @@ class JournalPanel(QWidget):
             return
         date = datetime.date(qdate.year(), qdate.month(), qdate.day())
         if date in self._journal_dates:
-            path = self.vault.path / "journal" / f"{date.isoformat()}.md"
+            path = self.vault.path / ".journal" / f"{date.isoformat()}.md"
             self.note_clicked.emit(str(path))
 
     def _on_date_activated(self, qdate: QDate) -> None:

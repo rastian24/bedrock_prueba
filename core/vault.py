@@ -87,12 +87,12 @@ class Vault:
     def ensure_journal_note(self, date: datetime.date | None = None) -> Path:
         """Ensure a journal note exists for the given date and return its path.
 
-        Creates the journal/ directory and YYYY-MM-DD.md file if they don't exist.
+        Creates the .journal/ directory and YYYY-MM-DD.md file if they don't exist.
         """
         if date is None:
             date = datetime.date.today()
 
-        journal_dir = self.path / "journal"
+        journal_dir = self.path / ".journal"
         journal_dir.mkdir(exist_ok=True)
 
         filename = date.strftime("%Y-%m-%d") + ".md"
