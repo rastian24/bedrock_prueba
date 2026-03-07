@@ -135,11 +135,15 @@ class SidebarPanel(QWidget):
         if not self._sections:
             return
         total = self._splitter.height()
-        n_collapsed = sum(1 for s in self._sections if not s.is_expanded)
+        visible = [s for s in self._sections if s.isVisible()]
+        n_collapsed = sum(1 for s in visible if not s.is_expanded)
         avail = max(total - n_collapsed * self._HEADER_H, 0)
-        n_expanded = len(self._sections) - n_collapsed
+        n_expanded = len(visible) - n_collapsed
         per = avail // max(n_expanded, 1)
-        sizes = [per if s.is_expanded else self._HEADER_H for s in self._sections]
+        sizes = [
+            (per if s.is_expanded else self._HEADER_H) if s.isVisible() else 0
+            for s in self._sections
+        ]
         self._splitter.setSizes(sizes)
 
     def _start_drag(self, section: CollapsibleSection) -> None:

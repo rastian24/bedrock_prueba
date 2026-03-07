@@ -173,23 +173,26 @@ class MainWindow(QMainWindow):
 
     def _on_graph_maximize(self, maximized: bool) -> None:
         if maximized:
-            # Save splitter state and move graph_view into the center slot
             self._graph_saved_sizes = self.splitter.sizes()  # [left, editor, right]
             left_w, editor_w, right_w = self._graph_saved_sizes
-            self.splitter.insertWidget(1, self.graph_view)   # splitter: [left, graph, editor, right]
-            self.editor_container.hide()
-            self.right_sidebar.hide()
-            self.splitter.setSizes([left_w, editor_w + right_w, 0, 0])
-        else:
-            # Move graph_view back into its CollapsibleSection and restore layout
-            self.graph_section.layout().addWidget(self.graph_view, stretch=1)
+            # Hide the entire graph section from the sidebar
+            self.graph_section.hide()
+            # Move graph_view into the center slot (replaces editor)
+            self.splitter.insertWidget(1, self.graph_view)   # [left, graph, editor, right]
             self.graph_view.show()
+            self.editor_container.hide()
+            self.splitter.setSizes([left_w, editor_w, 0, right_w])
+            QTimer.singleShot(0, self.right_sidebar._rebalance)
+        else:
+            # Move graph_view back into its CollapsibleSection and show the section
+            self.graph_section.layout().addWidget(self.graph_view, stretch=1)
+            self.graph_section.show()
+            self.graph_section.set_expanded(True)
             self.editor_container.show()
-            self.right_sidebar.show()
             if self._graph_saved_sizes:
                 self.splitter.setSizes(self._graph_saved_sizes)
             self._graph_saved_sizes = None
-            # Rebuild at the restored (smaller) canvas size
+            QTimer.singleShot(0, self.right_sidebar._rebalance)
             QTimer.singleShot(0, self.graph_view._rebuild)
 
     def _expand_search_section(self) -> None:
