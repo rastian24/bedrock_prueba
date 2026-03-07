@@ -74,7 +74,7 @@ class MainWindow(QMainWindow):
         self.tag_panel = TagPanel()
         self.journal_panel = JournalPanel()
         self.left_sidebar.add_section("Explorer", self.file_tree)
-        self.left_sidebar.add_section("Tags", self.tag_panel)
+        self.left_sidebar.add_section("Tags", self.tag_panel, expanded=False)
         self.left_sidebar.add_section("Journal", self.journal_panel)
 
         # Editor + find bar container
