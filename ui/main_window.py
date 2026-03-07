@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QStatusBar,
     QLabel, QMessageBox, QInputDialog,
 )
-from PySide6.QtCore import Qt, QThread, Signal, QByteArray
+from PySide6.QtCore import Qt, QThread, Signal, QByteArray, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
 
 from core.config import Config
@@ -53,6 +53,7 @@ class MainWindow(QMainWindow):
         self.vault_index = VaultIndex()
         self.search_engine: SearchEngine | None = None
         self._index_worker: IndexWorker | None = None
+        self._graph_saved_sizes: list[int] | None = None
 
         self.setWindowTitle("Bedrock")
         self.setMinimumSize(900, 600)
@@ -77,7 +78,8 @@ class MainWindow(QMainWindow):
         self.left_sidebar.add_section("Journal", self.journal_panel)
 
         # Editor + find bar container
-        editor_container = QWidget()
+        self.editor_container = QWidget()
+        editor_container = self.editor_container
         editor_layout = QVBoxLayout(editor_container)
         editor_layout.setContentsMargins(0, 0, 0, 0)
         editor_layout.setSpacing(0)
@@ -95,7 +97,7 @@ class MainWindow(QMainWindow):
         self.graph_view = GraphView()
         self.right_sidebar.add_section("Backlinks", self.backlinks_panel)
         self.right_sidebar.add_section("Search", self.vault_search_panel, expanded=False)
-        self.right_sidebar.add_section("Graph", self.graph_view)
+        self.graph_section = self.right_sidebar.add_section("Graph", self.graph_view)
 
         # Splitter
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
         self.journal_panel.note_clicked.connect(self._on_note_selected)
         self.vault_search_panel.note_clicked.connect(self._on_note_selected)
         self.graph_view.note_clicked.connect(self._on_note_selected)
+        self.graph_view.maximize_toggled.connect(self._on_graph_maximize)
 
     def _setup_shortcuts(self) -> None:
         self._shortcuts: dict[str, QShortcut] = {}
@@ -145,6 +148,7 @@ class MainWindow(QMainWindow):
         "change_vault": "_change_vault",
         "today_journal": "_open_today_journal",
         "settings": "_open_settings",
+        "graph_maximize": "_graph_maximize_shortcut",
     }
 
     def _apply_hotkeys(self, hotkeys: dict[str, str]) -> None:
@@ -163,6 +167,30 @@ class MainWindow(QMainWindow):
 
     def _toggle_right_sidebar(self) -> None:
         self.right_sidebar.setVisible(not self.right_sidebar.isVisible())
+
+    def _graph_maximize_shortcut(self) -> None:
+        self.graph_view.toggle_maximize()
+
+    def _on_graph_maximize(self, maximized: bool) -> None:
+        if maximized:
+            # Save splitter state and move graph_view into the center slot
+            self._graph_saved_sizes = self.splitter.sizes()  # [left, editor, right]
+            left_w, editor_w, right_w = self._graph_saved_sizes
+            self.splitter.insertWidget(1, self.graph_view)   # splitter: [left, graph, editor, right]
+            self.editor_container.hide()
+            self.right_sidebar.hide()
+            self.splitter.setSizes([left_w, editor_w + right_w, 0, 0])
+        else:
+            # Move graph_view back into its CollapsibleSection and restore layout
+            self.graph_section.layout().addWidget(self.graph_view, stretch=1)
+            self.graph_view.show()
+            self.editor_container.show()
+            self.right_sidebar.show()
+            if self._graph_saved_sizes:
+                self.splitter.setSizes(self._graph_saved_sizes)
+            self._graph_saved_sizes = None
+            # Rebuild at the restored (smaller) canvas size
+            QTimer.singleShot(0, self.graph_view._rebuild)
 
     def _expand_search_section(self) -> None:
         self.right_sidebar.expand_section(self.vault_search_panel)

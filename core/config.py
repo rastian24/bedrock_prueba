@@ -18,6 +18,7 @@ DEFAULT_HOTKEYS: dict[str, str] = {
     "change_vault": "Ctrl+Shift+O",
     "today_journal": "Ctrl+D",
     "settings": "Ctrl+,",
+    "graph_maximize": "Ctrl+G",
 }
 
 HOTKEY_LABELS: dict[str, str] = {
@@ -30,6 +31,7 @@ HOTKEY_LABELS: dict[str, str] = {
     "change_vault": "Change vault",
     "today_journal": "Open today's journal",
     "settings": "Open settings",
+    "graph_maximize": "Toggle graph (maximize / restore)",
 }
 
 _DEFAULTS: dict[str, Any] = {
