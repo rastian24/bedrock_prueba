@@ -12,7 +12,7 @@ from PySide6.QtGui import (
 from PySide6.QtCore import QUrl
 
 from core.vault import Vault
-from core.patterns import IMAGE_LINK, CHECKLIST, MD_LINK
+from core.patterns import IMAGE_LINK, CHECKLIST, MD_LINK, HORIZONTAL_RULE
 from ui.editor.markdown_highlighter import MarkdownHighlighter
 from ui.editor.wikilink_handler import WikilinkCompleter, find_wikilink_at_position
 
@@ -417,6 +417,14 @@ class WysiwygEditor(QPlainTextEdit):
                         int(QtNS.AlignmentFlag.AlignVCenter),
                         symbol,
                     )
+                    painter.restore()
+
+                # Draw horizontal rule
+                if HORIZONTAL_RULE.match(text):
+                    line_y = int(geom.top() + geom.height() / 2)
+                    painter.save()
+                    painter.setPen(QColor("#444444"))
+                    painter.drawLine(10, line_y, self.viewport().width() - 10, line_y)
                     painter.restore()
 
                 # Draw inline image

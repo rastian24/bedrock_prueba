@@ -124,11 +124,14 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             self.setFormat(0, bq.end(), marker_fmt)
             return
 
-        # Horizontal rule
+        # Horizontal rule — hide text on non-cursor lines (editor draws a line instead)
         if patterns.HORIZONTAL_RULE.match(text):
-            fmt = QTextCharFormat()
-            fmt.setForeground(GRAY_COLOR)
-            self.setFormat(0, len(text), fmt)
+            if is_cursor_line:
+                fmt = QTextCharFormat()
+                fmt.setForeground(GRAY_COLOR)
+                self.setFormat(0, len(text), fmt)
+            else:
+                self.setFormat(0, len(text), self._hidden_fmt())
             return
 
         # Checklist items: - [ ] or - [x]
