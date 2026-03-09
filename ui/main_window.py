@@ -128,6 +128,7 @@ class MainWindow(QMainWindow):
         self.editor.saved.connect(self._on_note_saved)
         self.editor.content_changed.connect(self._update_word_count)
         self.editor.wikilink_clicked.connect(self._on_wikilink_clicked)
+        self.editor.tag_at_cursor.connect(self._on_tag_at_cursor)
         self.backlinks_panel.note_clicked.connect(self._on_note_selected)
         self.tag_panel.tag_clicked.connect(self._on_tag_clicked)
         self.journal_panel.note_clicked.connect(self._on_note_selected)
@@ -366,6 +367,24 @@ class MainWindow(QMainWindow):
         self.vault_search_panel.show_tag_results(tag, notes)
         self.right_sidebar.setVisible(True)
         self._expand_search_section()
+
+    def _on_tag_at_cursor(self, tag: str) -> None:
+        """Update tag panel selection and (if Search is expanded) search results."""
+        self.tag_panel.highlight_tag(tag)
+        if not tag:
+            return
+        # Only update search panel if the Search section is already expanded
+        search_section = next(
+            (s for s in self.right_sidebar._sections if s.content is self.vault_search_panel),
+            None,
+        )
+        if search_section and self.right_sidebar.isVisible():
+            notes = self.vault_index.get_notes_for_tag(tag)
+            if self.search_engine:
+                self.vault_search_panel.set_search_engine(self.search_engine)
+            self.vault_search_panel.show_tag_results(tag, notes)
+            if not search_section.is_expanded:
+                self._expand_search_section()
 
     # --- New note ---
 

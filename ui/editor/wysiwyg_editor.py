@@ -12,7 +12,7 @@ from PySide6.QtGui import (
 from PySide6.QtCore import QUrl
 
 from core.vault import Vault
-from core.patterns import IMAGE_LINK, CHECKLIST, MD_LINK, HORIZONTAL_RULE
+from core.patterns import IMAGE_LINK, CHECKLIST, MD_LINK, HORIZONTAL_RULE, TAG
 from ui.editor.markdown_highlighter import MarkdownHighlighter
 from ui.editor.wikilink_handler import WikilinkCompleter, find_wikilink_at_position
 
@@ -27,12 +27,14 @@ class WysiwygEditor(QPlainTextEdit):
     saved = Signal(str)  # Emits file path on save
     content_changed = Signal()
     wikilink_clicked = Signal(str)  # Emits target name
+    tag_at_cursor = Signal(str)  # Emits tag name (without #) or "" when leaving a tag
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.vault: Vault | None = None
         self.current_note: Path | None = None
         self._modified = False
+        self._current_tag: str = ""
         self._pixmap_cache: dict[str, QPixmap | None] = {}
         self._image_block_heights: dict[int, int] = {}  # block_number -> image height
 
@@ -104,6 +106,13 @@ class WysiwygEditor(QPlainTextEdit):
         self.content_changed.emit()
         self._update_image_margins()
 
+    def _find_tag_at_position(self, text: str, pos: int) -> str:
+        """Return tag name (without #) if cursor is within a #tag, else ''."""
+        for m in TAG.finditer(text):
+            if m.start() <= pos <= m.end():
+                return m.group(1)
+        return ""
+
     def _on_cursor_moved(self) -> None:
         block_num = self.textCursor().blockNumber()
         old_block = self.highlighter._cursor_block_number
@@ -113,6 +122,12 @@ class WysiwygEditor(QPlainTextEdit):
             if old_block in self._image_block_heights or block_num in self._image_block_heights:
                 self._update_image_margins()
                 self.viewport().update()
+        # Detect tag under cursor and emit if changed
+        cursor = self.textCursor()
+        tag = self._find_tag_at_position(cursor.block().text(), cursor.positionInBlock())
+        if tag != self._current_tag:
+            self._current_tag = tag
+            self.tag_at_cursor.emit(tag)
 
     # --- Key handling ---
 
