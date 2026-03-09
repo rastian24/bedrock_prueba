@@ -7,11 +7,12 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtCore import QRectF
 from PySide6.QtGui import (
     QTextCursor, QFont, QKeyEvent, QMouseEvent,
-    QPixmap, QPainter, QColor,
+    QPixmap, QPainter, QColor, QDesktopServices,
 )
+from PySide6.QtCore import QUrl
 
 from core.vault import Vault
-from core.patterns import IMAGE_LINK, CHECKLIST
+from core.patterns import IMAGE_LINK, CHECKLIST, MD_LINK
 from ui.editor.markdown_highlighter import MarkdownHighlighter
 from ui.editor.wikilink_handler import WikilinkCompleter, find_wikilink_at_position
 
@@ -174,12 +175,37 @@ class WysiwygEditor(QPlainTextEdit):
         # After processing the key, update completer
         self.completer.handle_key(event.text(), self.textCursor())
 
+    def keyReleaseEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Control:
+            self.viewport().unsetCursor()
+        super().keyReleaseEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            cursor = self.cursorForPosition(event.position().toPoint())
+            block = cursor.block()
+            url = self._find_md_link_at_position(block.text(), cursor.positionInBlock())
+            if url:
+                self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+            else:
+                self.viewport().unsetCursor()
+        else:
+            self.viewport().unsetCursor()
+        super().mouseMoveEvent(event)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             click_pos = event.position().toPoint()
             cursor = self.cursorForPosition(click_pos)
             block = cursor.block()
             pos_in_block = cursor.positionInBlock()
+
+            # Ctrl+Click: open markdown links in browser
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                url = self._find_md_link_at_position(block.text(), pos_in_block)
+                if url:
+                    QDesktopServices.openUrl(QUrl(url))
+                    return
 
             # Toggle checkbox on click
             check_m = CHECKLIST.match(block.text())
@@ -195,6 +221,13 @@ class WysiwygEditor(QPlainTextEdit):
                 self.wikilink_clicked.emit(target)
                 return
         super().mousePressEvent(event)
+
+    def _find_md_link_at_position(self, text: str, pos: int) -> str | None:
+        """Return the URL if pos falls within a [text](url) link, else None."""
+        for m in MD_LINK.finditer(text):
+            if m.start() <= pos <= m.end():
+                return m.group(2)
+        return None
 
     def _toggle_checkbox(self, block, check_match) -> None:
         """Toggle a checklist item between [ ] and [x]."""
