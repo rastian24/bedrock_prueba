@@ -124,6 +124,7 @@ class MainWindow(QMainWindow):
         # Connect signals
         self.file_tree.note_selected.connect(self._on_note_selected)
         self.file_tree.note_created.connect(self._on_note_selected)
+        self.file_tree.note_moved.connect(self._on_note_moved)
         self.editor.saved.connect(self._on_note_saved)
         self.editor.content_changed.connect(self._update_word_count)
         self.editor.wikilink_clicked.connect(self._on_wikilink_clicked)
@@ -308,6 +309,16 @@ class MainWindow(QMainWindow):
         self._update_word_count()
         self._update_backlinks()
         self.graph_view.set_current_note(path)
+
+    def _on_note_moved(self, old_path: str, new_path: str) -> None:
+        """Update editor and indices when a note is moved via drag and drop."""
+        if self.editor.current_note and str(self.editor.current_note) == old_path:
+            self._on_note_selected(new_path)
+        if self.vault_index:
+            self.vault_index.remove_note(Path(old_path))
+            self.vault_index.update_note(Path(new_path))
+        if self.search_engine:
+            self.search_engine.update_note(Path(new_path))
 
     def _on_note_saved(self, path: str) -> None:
         note_path = Path(path)

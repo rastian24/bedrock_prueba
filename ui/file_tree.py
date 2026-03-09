@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTreeView, QMenu, QInputDialog,
-    QMessageBox,
+    QMessageBox, QAbstractItemView,
 )
 from PySide6.QtCore import (
     Qt, Signal, QSortFilterProxyModel, QModelIndex,
@@ -38,11 +38,54 @@ class VaultFilterProxy(QSortFilterProxyModel):
         return name.endswith(".md")
 
 
+class VaultTreeView(QTreeView):
+    """Tree view that emits file move information after drag-and-drop."""
+
+    files_moved = Signal(list)  # [(old_path_str, new_path_str), ...]
+
+    def dropEvent(self, event) -> None:
+        mime = event.mimeData()
+        if not mime.hasUrls():
+            event.ignore()
+            return
+
+        source_paths = [Path(url.toLocalFile()) for url in mime.urls()]
+        target_folder = self._resolve_drop_folder(self.indexAt(event.pos()))
+
+        if target_folder is None:
+            event.ignore()
+            return
+
+        super().dropEvent(event)
+
+        moves = [
+            (str(src), str(target_folder / src.name))
+            for src in source_paths
+            if src.parent != target_folder and (target_folder / src.name).exists()
+        ]
+        if moves:
+            self.files_moved.emit(moves)
+
+    def _resolve_drop_folder(self, proxy_idx: QModelIndex) -> Path | None:
+        proxy = self.model()
+        if proxy is None:
+            return None
+        fs_model = proxy.sourceModel()
+        if not proxy_idx.isValid():
+            source_root = proxy.mapToSource(self.rootIndex())
+            root_path = Path(fs_model.filePath(source_root))
+            return root_path if root_path.is_dir() else None
+        source_idx = proxy.mapToSource(proxy_idx)
+        path = Path(fs_model.filePath(source_idx))
+        return path if path.is_dir() else path.parent
+
+
 class FileTree(QWidget):
     """File explorer tree view for the vault."""
 
     note_selected = Signal(str)
     note_created = Signal(str)
+    note_moved = Signal(str, str)  # old_path, new_path
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -53,13 +96,22 @@ class FileTree(QWidget):
         layout.setSpacing(0)
 
         # Tree view
-        self.tree = QTreeView()
+        self.tree = VaultTreeView()
         self.tree.setHeaderHidden(True)
         self.tree.setAnimated(True)
         self.tree.setIndentation(16)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._context_menu)
         self.tree.clicked.connect(self._on_clicked)
+
+        # Drag and drop
+        self.tree.setDragEnabled(True)
+        self.tree.setAcceptDrops(True)
+        self.tree.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.tree.setDropIndicatorShown(True)
+        self.tree.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.tree.files_moved.connect(self._on_files_moved)
+
         layout.addWidget(self.tree)
 
         # Model
@@ -198,6 +250,12 @@ class FileTree(QWidget):
             else:
                 self.vault.delete_note(path)
             self._refresh_proxy()
+
+    def _on_files_moved(self, moves: list) -> None:
+        self._refresh_proxy()
+        for old_path, new_path in moves:
+            if old_path.endswith(".md"):
+                self.note_moved.emit(old_path, new_path)
 
     def _refresh_proxy(self) -> None:
         """Force the proxy filter to re-evaluate so new/removed files appear immediately."""
