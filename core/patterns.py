@@ -43,3 +43,6 @@ IMAGE_LINK = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
 
 # Checklist items: - [ ] or - [x] (also with * or +)
 CHECKLIST = re.compile(r'^(\s*[-*+]\s+)\[([ xX])\]\s+', re.MULTILINE)
+
+# Full checkbox lines for TODO aggregation: captures the entire line
+TODO_ITEM = re.compile(r'^[ \t]*[-*+] \[([ xX])\] .+$', re.MULTILINE)

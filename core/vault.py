@@ -122,3 +122,15 @@ class Vault:
         new_path = old_path.parent / new_name
         old_path.rename(new_path)
         return new_path
+
+    @property
+    def todo_file_path(self) -> Path:
+        """Path to the aggregated .TODO file at the vault root."""
+        return self.path / ".TODO"
+
+    def write_todo_file(self, content: str) -> None:
+        """Write the aggregated TODO file."""
+        try:
+            self.todo_file_path.write_text(content, encoding="utf-8")
+        except OSError:
+            pass

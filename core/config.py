@@ -19,6 +19,7 @@ DEFAULT_HOTKEYS: dict[str, str] = {
     "today_journal": "Ctrl+D",
     "settings": "Ctrl+,",
     "graph_maximize": "Ctrl+G",
+    "open_todo": "Ctrl+Ntilde",
 }
 
 HOTKEY_LABELS: dict[str, str] = {
@@ -32,6 +33,7 @@ HOTKEY_LABELS: dict[str, str] = {
     "today_journal": "Open today's journal",
     "settings": "Open settings",
     "graph_maximize": "Toggle graph (maximize / restore)",
+    "open_todo": "Open TODO",
 }
 
 _DEFAULTS: dict[str, Any] = {

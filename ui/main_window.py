@@ -54,6 +54,7 @@ class MainWindow(QMainWindow):
         self.search_engine: SearchEngine | None = None
         self._index_worker: IndexWorker | None = None
         self._graph_saved_sizes: list[int] | None = None
+        self._pre_todo_note: Path | None = None  # note open before switching to .TODO
 
         self.setWindowTitle("Bedrock")
         self.setMinimumSize(900, 600)
@@ -151,6 +152,7 @@ class MainWindow(QMainWindow):
         "today_journal": "_open_today_journal",
         "settings": "_open_settings",
         "graph_maximize": "_graph_maximize_shortcut",
+        "open_todo": "_open_todo",
     }
 
     def _apply_hotkeys(self, hotkeys: dict[str, str]) -> None:
@@ -286,6 +288,7 @@ class MainWindow(QMainWindow):
         self.journal_panel.refresh()
         if self.vault:
             self.graph_view.set_graph(self.vault, self.vault_index)
+        self._update_todo_file()
 
     # --- Journal ---
 
@@ -332,6 +335,7 @@ class MainWindow(QMainWindow):
         self._update_tags()
         if self.vault:
             self.graph_view.set_graph(self.vault, self.vault_index)
+        self._update_todo_file()
 
     def _update_word_count(self) -> None:
         text = self.editor.toPlainText()
@@ -349,6 +353,53 @@ class MainWindow(QMainWindow):
     def _update_tags(self) -> None:
         tags = self.vault_index.get_all_tags()
         self.tag_panel.set_tags(tags)
+
+    def _update_todo_file(self) -> None:
+        """Regenerate the .TODO file from all checkboxes in the vault."""
+        if not self.vault:
+            return
+        from core.markdown_parser import extract_todos
+        from datetime import datetime
+
+        todos_by_note: dict[Path, list[str]] = {}
+        for note_path in sorted(self.vault.list_notes(), key=lambda p: p.stem.lower()):
+            try:
+                text = note_path.read_text(encoding="utf-8")
+                items = extract_todos(text)
+                if items:
+                    todos_by_note[note_path] = items
+            except (OSError, UnicodeDecodeError):
+                pass
+
+        lines = ["# TODO", "", f"_Actualizado: {datetime.now().strftime('%Y-%m-%d %H:%M')}_", ""]
+        if not todos_by_note:
+            lines.append("_No se encontraron tareas en el vault._")
+        else:
+            for note_path, items in todos_by_note.items():
+                lines.append(f"#### {note_path.stem}")
+                lines.append("")
+                lines.extend(items)
+                lines.append("")
+        self.vault.write_todo_file("\n".join(lines))
+
+        # Refresh the editor if .TODO is currently open
+        if self.editor.current_note == self.vault.todo_file_path:
+            self.editor.open_note(self.vault.todo_file_path)
+
+    def _open_todo(self) -> None:
+        """Toggle .TODO: open it if not current, or return to previous note if it is."""
+        if not self.vault:
+            return
+        if self.editor.current_note == self.vault.todo_file_path:
+            # Already viewing .TODO — go back to the previous note
+            if self._pre_todo_note and self._pre_todo_note.exists():
+                self._on_note_selected(self._pre_todo_note)
+            self._pre_todo_note = None
+        else:
+            # Save current note as the one to return to
+            self._pre_todo_note = self.editor.current_note
+            self._update_todo_file()
+            self._on_note_selected(self.vault.todo_file_path)
 
     def _on_wikilink_clicked(self, target: str) -> None:
         if not self.vault:

@@ -88,6 +88,7 @@ class WysiwygEditor(QPlainTextEdit):
         self._pixmap_cache.clear()
         self._image_block_heights.clear()
         self._update_image_margins()
+        self.setReadOnly(path.name == ".TODO")
         self.setFocus()
 
     def save_now(self) -> None:
