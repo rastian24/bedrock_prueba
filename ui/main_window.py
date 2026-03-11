@@ -361,8 +361,11 @@ class MainWindow(QMainWindow):
         from core.markdown_parser import extract_todos
         from datetime import datetime
 
+        import re
+        date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
         todos_by_note: dict[Path, list[str]] = {}
-        for note_path in sorted(self.vault.list_notes(), key=lambda p: p.stem.lower()):
+        for note_path in self.vault.list_notes():
             try:
                 text = note_path.read_text(encoding="utf-8")
                 items = extract_todos(text)
@@ -375,10 +378,19 @@ class MainWindow(QMainWindow):
         if not todos_by_note:
             lines.append("_No se encontraron tareas en el vault._")
         else:
-            for note_path, items in todos_by_note.items():
+            non_journal = {p: items for p, items in todos_by_note.items() if not date_re.match(p.stem)}
+            journal = {p: items for p, items in todos_by_note.items() if date_re.match(p.stem)}
+
+            for note_path in sorted(non_journal, key=lambda p: p.stem.lower()):
                 lines.append(f"#### {note_path.stem}")
                 lines.append("")
-                lines.extend(items)
+                lines.extend(non_journal[note_path])
+                lines.append("")
+
+            for note_path in sorted(journal, key=lambda p: p.stem, reverse=True):
+                lines.append(f"#### {note_path.stem}")
+                lines.append("")
+                lines.extend(journal[note_path])
                 lines.append("")
         self.vault.write_todo_file("\n".join(lines))
 
