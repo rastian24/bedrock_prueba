@@ -265,6 +265,9 @@ class MainWindow(QMainWindow):
         # Set vault on components
         self.file_tree.set_vault(self.vault)
         self.editor.set_vault(self.vault)
+        self.editor.tag_completer.set_tag_source(
+            lambda: sorted(self.vault_index.get_all_tags().keys())
+        )
         self.journal_panel.set_vault(self.vault)
 
         # Build index in background

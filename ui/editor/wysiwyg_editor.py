@@ -14,7 +14,7 @@ from PySide6.QtCore import QUrl
 from core.vault import Vault
 from core.patterns import IMAGE_LINK, CHECKLIST, MD_LINK, HORIZONTAL_RULE, TAG
 from ui.editor.markdown_highlighter import MarkdownHighlighter
-from ui.editor.wikilink_handler import WikilinkCompleter, find_wikilink_at_position
+from ui.editor.wikilink_handler import WikilinkCompleter, TagCompleter, find_wikilink_at_position
 
 # Max width for rendered images (pixels)
 IMAGE_MAX_WIDTH = 500
@@ -50,6 +50,9 @@ class WysiwygEditor(QPlainTextEdit):
 
         # Wikilink completer
         self.completer = WikilinkCompleter(self)
+
+        # Tag completer
+        self.tag_completer = TagCompleter(self)
 
         # Auto-save timer (2s debounce)
         self._save_timer = QTimer(self)
@@ -136,19 +139,24 @@ class WysiwygEditor(QPlainTextEdit):
         modifiers = event.modifiers()
         key = event.key()
 
-        # Completer navigation
-        if self.completer.is_active():
+        # Completer navigation (wikilink or tag)
+        active_completer = (
+            self.completer if self.completer.is_active()
+            else self.tag_completer if self.tag_completer.is_active()
+            else None
+        )
+        if active_completer:
             if key == Qt.Key.Key_Return or key == Qt.Key.Key_Tab:
-                if self.completer.accept_completion():
+                if active_completer.accept_completion():
                     return
             elif key == Qt.Key.Key_Escape:
-                self.completer.hide()
+                active_completer.hide()
                 return
             elif key == Qt.Key.Key_Down:
-                self.completer.move_selection(1)
+                active_completer.move_selection(1)
                 return
             elif key == Qt.Key.Key_Up:
-                self.completer.move_selection(-1)
+                active_completer.move_selection(-1)
                 return
 
         # Keyboard shortcuts
@@ -188,8 +196,9 @@ class WysiwygEditor(QPlainTextEdit):
 
         super().keyPressEvent(event)
 
-        # After processing the key, update completer
+        # After processing the key, update completers
         self.completer.handle_key(event.text(), self.textCursor())
+        self.tag_completer.handle_key(event.text(), self.textCursor())
 
     def keyReleaseEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Control:
