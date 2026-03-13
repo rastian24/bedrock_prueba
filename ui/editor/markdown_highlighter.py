@@ -212,14 +212,15 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         for m in patterns.ITALIC.finditer(region):
             abs_start = start + m.start()
             length = m.end() - m.start()
+            marker_len = len(m.group(1))  # __
             fmt = QTextCharFormat()
             fmt.setFontItalic(True)
             fmt.setForeground(TEXT_COLOR)
             self.setFormat(abs_start, length, fmt)
             # Hide markers
             marker_fmt = self._marker_fmt(is_cursor_line, fmt)
-            self.setFormat(abs_start, 1, marker_fmt)
-            self.setFormat(abs_start + length - 1, 1, marker_fmt)
+            self.setFormat(abs_start, marker_len, marker_fmt)
+            self.setFormat(abs_start + length - marker_len, marker_len, marker_fmt)
 
         # Wikilinks
         for m in patterns.WIKILINK.finditer(region):

@@ -11,11 +11,11 @@ TAG = re.compile(r'(?<!\w)#([\w][\w/-]*)')
 # Markdown headings
 HEADING = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
 
-# Bold: **text** or __text__
-BOLD = re.compile(r'(\*\*|__)(.+?)\1')
+# Bold: **text** only
+BOLD = re.compile(r'(\*\*)(.+?)\1')
 
-# Italic: *text* or _text_ (not bold)
-ITALIC = re.compile(r'(?<!\*)(\*)((?!\*).*?)\1(?!\*)|(?<!_)(_)((?!_).*?)\3(?!_)')
+# Italic: __text__ only
+ITALIC = re.compile(r'(__)(.+?)\1')
 
 # Inline code: `code`
 INLINE_CODE = re.compile(r'(`)((?!`).+?)\1')

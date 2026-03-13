@@ -168,7 +168,7 @@ class WysiwygEditor(QPlainTextEdit):
                 self._toggle_wrap("**")
                 return
             elif key == Qt.Key.Key_I:
-                self._toggle_wrap("*")
+                self._toggle_wrap("__")
                 return
             elif key == Qt.Key.Key_K:
                 self._insert_md_link()
@@ -269,7 +269,7 @@ class WysiwygEditor(QPlainTextEdit):
     # --- Formatting helpers ---
 
     def _toggle_wrap(self, marker: str) -> None:
-        """Toggle a wrap marker (**, *) around the selection."""
+        """Toggle a wrap marker (**, __) around the selection."""
         cursor = self.textCursor()
         if cursor.hasSelection():
             text = cursor.selectedText()
