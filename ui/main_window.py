@@ -395,11 +395,33 @@ class MainWindow(QMainWindow):
                 lines.append("")
                 lines.extend(journal[note_path])
                 lines.append("")
-        self.vault.write_todo_file("\n".join(lines))
+        new_content = "\n".join(lines)
 
-        # Refresh the editor if .TODO is currently open
+        # Only write and refresh if the content actually changed (ignoring the timestamp line)
+        try:
+            old_content = self.vault.todo_file_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            old_content = ""
+
+        # Strip the timestamp line for comparison so minute-by-minute changes don't cause reloads
+        def _strip_timestamp(text: str) -> str:
+            return "\n".join(
+                line for line in text.splitlines()
+                if not line.startswith("_Actualizado:")
+            )
+
+        if _strip_timestamp(new_content) == _strip_timestamp(old_content):
+            return
+
+        self.vault.write_todo_file(new_content)
+
+        # Refresh the editor if .TODO is currently open, preserving scroll position
         if self.editor.current_note == self.vault.todo_file_path:
+            scrollbar = self.editor.verticalScrollBar()
+            scroll_pos = scrollbar.value() if scrollbar else 0
             self.editor.open_note(self.vault.todo_file_path)
+            if scrollbar:
+                scrollbar.setValue(scroll_pos)
 
     def _open_todo(self) -> None:
         """Toggle .TODO: open it if not current, or return to previous note if it is."""
