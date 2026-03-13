@@ -110,7 +110,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             marker_fmt = self._marker_fmt(is_cursor_line, fmt)
             self.setFormat(0, len(m.group(1)) + 1, marker_fmt)
             # Still process inline formatting within headings
-            self._apply_inline(text, is_cursor_line, start=m.start(2))
+            self._apply_inline(text, is_cursor_line, start=m.start(2), base_fmt=fmt)
             return
 
         # Blockquote
@@ -171,7 +171,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         # Apply inline formatting
         self._apply_inline(text, is_cursor_line)
 
-    def _apply_inline(self, text: str, is_cursor_line: bool, start: int = 0) -> None:
+    def _apply_inline(self, text: str, is_cursor_line: bool, start: int = 0, base_fmt: QTextCharFormat | None = None) -> None:
         """Apply inline formatting: bold, italic, code, wikilinks, tags, links."""
         region = text[start:]
 
@@ -226,7 +226,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         for m in patterns.WIKILINK.finditer(region):
             abs_start = start + m.start()
             length = m.end() - m.start()
-            fmt = QTextCharFormat()
+            fmt = QTextCharFormat(base_fmt) if base_fmt else QTextCharFormat()
             fmt.setForeground(ACCENT_COLOR)
             fmt.setFontUnderline(True)
             self.setFormat(abs_start, length, fmt)
@@ -269,7 +269,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         for m in patterns.TAG.finditer(region):
             abs_start = start + m.start()
             length = len(m.group(0))  # group(0) includes the #
-            fmt = QTextCharFormat()
+            fmt = QTextCharFormat(base_fmt) if base_fmt else QTextCharFormat()
             fmt.setForeground(TAG_COLOR)
             self.setFormat(abs_start, length, fmt)
 
