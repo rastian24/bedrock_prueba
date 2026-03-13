@@ -385,13 +385,13 @@ class MainWindow(QMainWindow):
             journal = {p: items for p, items in todos_by_note.items() if date_re.match(p.stem)}
 
             for note_path in sorted(non_journal, key=lambda p: p.stem.lower()):
-                lines.append(f"#### {note_path.stem}")
+                lines.append(f"#### [[{note_path.stem}]]")
                 lines.append("")
                 lines.extend(non_journal[note_path])
                 lines.append("")
 
             for note_path in sorted(journal, key=lambda p: p.stem, reverse=True):
-                lines.append(f"#### {note_path.stem}")
+                lines.append(f"#### [[{note_path.stem}]]")
                 lines.append("")
                 lines.extend(journal[note_path])
                 lines.append("")
